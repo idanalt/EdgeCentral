@@ -27,10 +27,18 @@ class TheftDetectionPipeline:
         zones_path: str | None = None,
         conf: float = 0.35,
         sinks: list[AlertSink] | None = None,
+        person_classes: set[str] | None = None,
+        item_classes: set[str] | None = None,
+        suspicious_classes: set[str] | None = None,
     ) -> None:
         self.model = YOLO(weights)
         self.conf = conf
-        self.detector = ConcealmentDetector(zones=load_zones(zones_path))
+        self.detector = ConcealmentDetector(
+            zones=load_zones(zones_path),
+            person_classes=person_classes,
+            item_classes=item_classes,
+            suspicious_classes=suspicious_classes,
+        )
         self.sinks = sinks or []
 
     def process_frame(self, frame: np.ndarray) -> tuple[np.ndarray, list]:

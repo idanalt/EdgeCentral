@@ -55,6 +55,22 @@ python scripts/prepare_dataset.py
 
 אם אין לכם עדיין דאטהסט ספציפי — אפשר להתחיל עם דאטהסט generic של `person` + `backpack`/`handbag` (למשל תת-קבוצה מ-COCO) כבייסליין, ולשפר בהמשך עם דאטהסט ייעודי.
 
+### דוגמה: דאטהסט "Shoplifting" (weaponDetection, Roboflow)
+
+https://universe.roboflow.com/weapondetection-jyvpf/shoplifting-sbnqg — 153 תמונות, Object Detection, 2 מחלקות: `Normal Behavior` / `Suspicious Behavior` (הקופסה עצמה מתייגת את ההתנהגות, לא "person"+"item" נפרדים). רישיון CC BY 4.0 — **נדרשת קרדיטציה** ל-workspace המקורי אם משתמשים בזה בפריסה.
+
+⚠️ **153 תמונות זה דאטהסט קטן מאוד.** ה-mAP@50 של ~95% שמוצג בדף נמדד על ולידציה מאותו מאגר קטן/אותה חנות/מצלמה — לא אינדיקציה אמינה לביצועים בסופר/קיוסק אחר. השתמשו בזה כ-proof-of-concept, ותכננו לאסוף ולתייג צילומים מהאתר האמיתי שלכם לפני פריסה אמיתית.
+
+מכיוון שהמחלקות כאן הן `Normal Behavior`/`Suspicious Behavior` ולא `person`/`item`, ה-heuristic של "פריט נעלם ליד אדם" לא רלוונטי לדאטהסט הזה. יש כאן heuristic מתאים — "sustained suspicious behavior" ב-`detection/behavior.py` — שמחכה שהמחלקה `Suspicious Behavior` תחזיק כמה שניות ברצף (לא רק פריים בודד רועש) לפני שמתריע. מריצים עם:
+
+```bash
+python -m inference.run_stream \
+  --weights best.pt \
+  --source 0 \
+  --person-classes "Normal Behavior,Suspicious Behavior" \
+  --suspicious-classes "Suspicious Behavior"
+```
+
 ## שלב 2: אימון
 
 ```bash

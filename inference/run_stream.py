@@ -23,7 +23,26 @@ def main() -> None:
     parser.add_argument("--conf", type=float, default=0.35)
     parser.add_argument("--alerts-dir", default="alerts")
     parser.add_argument("--display", action="store_true", help="show a live preview window")
+    parser.add_argument(
+        "--person-classes",
+        default="person",
+        help="comma-separated class names that represent a trackable person (used for zone dwell/exit logic)",
+    )
+    parser.add_argument(
+        "--item-classes",
+        default="",
+        help="comma-separated class names that can be concealed (leave empty if the dataset has no separate item class)",
+    )
+    parser.add_argument(
+        "--suspicious-classes",
+        default="",
+        help="comma-separated class names that directly label suspicious behavior on a single box "
+        "(e.g. 'Suspicious Behavior' for a dataset with Normal/Suspicious Behavior classes)",
+    )
     args = parser.parse_args()
+
+    def _split(s: str) -> set[str]:
+        return {c.strip() for c in s.split(",") if c.strip()}
 
     source = int(args.source) if args.source.isdigit() else args.source
     cap = cv2.VideoCapture(source)
@@ -35,6 +54,9 @@ def main() -> None:
         zones_path=args.zones,
         conf=args.conf,
         sinks=[LocalLogSink(args.alerts_dir)],
+        person_classes=_split(args.person_classes),
+        item_classes=_split(args.item_classes) or None,
+        suspicious_classes=_split(args.suspicious_classes) or None,
     )
 
     try:

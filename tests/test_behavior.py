@@ -80,6 +80,50 @@ def test_loitering_alert_after_dwell_threshold():
     assert alerts[0].kind == "loitering"
 
 
+def test_no_alert_for_brief_suspicious_flicker():
+    det = ConcealmentDetector(suspicious_classes={"Suspicious Behavior"})
+    # A single noisy frame classified as suspicious, then back to normal.
+    det.update([{"track_id": 1, "cls": "Suspicious Behavior", "bbox": (0, 0, 50, 50)}], now=0.0)
+    alerts = det.update([{"track_id": 1, "cls": "Normal Behavior", "bbox": (0, 0, 50, 50)}], now=0.3)
+    assert alerts == []
+
+
+def test_alert_after_sustained_suspicious_behavior():
+    det = ConcealmentDetector(suspicious_classes={"Suspicious Behavior"})
+    t = 0.0
+    alerts = []
+    for _ in range(10):
+        alerts = det.update(
+            [{"track_id": 1, "cls": "Suspicious Behavior", "bbox": (0, 0, 50, 50)}], now=t
+        )
+        if alerts:
+            break
+        t += 0.3
+
+    assert len(alerts) == 1
+    assert alerts[0].kind == "suspicious_behavior"
+    assert alerts[0].track_id == 1
+
+    # Doesn't keep re-firing every frame while still flagged.
+    more_alerts = det.update(
+        [{"track_id": 1, "cls": "Suspicious Behavior", "bbox": (0, 0, 50, 50)}], now=t + 0.3
+    )
+    assert more_alerts == []
+
+
+def test_suspicious_streak_resets_on_normal_behavior():
+    det = ConcealmentDetector(suspicious_classes={"Suspicious Behavior"})
+    det.update([{"track_id": 1, "cls": "Suspicious Behavior", "bbox": (0, 0, 50, 50)}], now=0.0)
+    det.update([{"track_id": 1, "cls": "Suspicious Behavior", "bbox": (0, 0, 50, 50)}], now=1.0)
+    # Genuinely back to normal for a while (not just a missed frame).
+    det.update([{"track_id": 1, "cls": "Normal Behavior", "bbox": (0, 0, 50, 50)}], now=3.0)
+    # Suspicious again — streak should have restarted, not counting the earlier 1s.
+    alerts = det.update(
+        [{"track_id": 1, "cls": "Suspicious Behavior", "bbox": (0, 0, 50, 50)}], now=3.5
+    )
+    assert alerts == []
+
+
 def test_exit_with_concealment_is_high_priority():
     from shapely.geometry import Polygon
 

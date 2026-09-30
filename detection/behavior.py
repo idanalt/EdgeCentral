@@ -7,11 +7,18 @@ auditable heuristics:
 
   1. Concealment: an "item"-class track that was overlapping a person's
      torso region disappears while that person keeps moving (classic
-     "into the bag/jacket" signal).
-  2. Loitering: a person dwells inside a configured "shelf" zone longer
+     "into the bag/jacket" signal). Used with datasets that detect
+     persons and items as separate classes.
+  2. Sustained suspicious behavior: a track classified directly as a
+     "suspicious" class (e.g. a dataset that labels the whole behavior
+     as one box, like "Suspicious Behavior" vs "Normal Behavior") holds
+     that class for several consecutive seconds — filters out one-frame
+     detector noise before alerting.
+  3. Loitering: a person dwells inside a configured "shelf" zone longer
      than a threshold.
-  3. Exit-with-concealment: a person carrying an active concealment flag
-     enters a configured "exit" zone — the highest-priority alert.
+  4. Exit-with-concealment: a person carrying an active concealment or
+     sustained-suspicious flag enters a configured "exit" zone — the
+     highest-priority alert.
 
 These are heuristics, not proof. Every alert exists to be reviewed by a
 human before any action is taken.
@@ -31,8 +38,15 @@ DEFAULT_ITEM_CLASSES = {"item", "product", "bag", "backpack", "handbag", "bottle
 # How long an item can go untracked (occlusion, brief detector miss) before
 # we treat it as "disappeared" rather than "briefly lost".
 ITEM_DISAPPEAR_GRACE_SECONDS = 1.5
-# How long a concealment flag stays valid on a person track before decaying.
+# How long a concealment/sustained-suspicious flag stays valid on a person
+# track before decaying (long enough to survive a short walk to the exit).
 CONCEALMENT_FLAG_TTL_SECONDS = 60.0
+# How long a track must hold a "suspicious" class continuously before it
+# counts as a real signal rather than one noisy frame.
+SUSPICIOUS_SUSTAIN_SECONDS = 1.5
+# A brief gap (missed frame, momentary re-classification) doesn't reset the
+# streak; a gap longer than this does.
+SUSPICIOUS_RESET_GRACE_SECONDS = 1.0
 
 
 def _center(bbox: BBox) -> tuple[float, float]:
@@ -80,6 +94,9 @@ class TrackState:
     concealment_flag_until: float = 0.0
     zone_enter_time: dict[str, float] = field(default_factory=dict)
     loiter_alerted: set[str] = field(default_factory=set)
+    suspicious_since: float | None = None
+    suspicious_last_seen: float | None = None
+    suspicious_alerted: bool = False
 
     def is_flagged(self, now: float) -> bool:
         return self.concealment_flag_until > now
@@ -87,7 +104,7 @@ class TrackState:
 
 @dataclass
 class Alert:
-    kind: str  # "concealment" | "loitering" | "exit_with_concealment"
+    kind: str  # "concealment" | "suspicious_behavior" | "loitering" | "exit_with_concealment"
     track_id: int
     severity: str  # "low" | "medium" | "high"
     score: float
@@ -104,10 +121,15 @@ class ConcealmentDetector:
         zones: list[Zone] | None = None,
         person_classes: set[str] | None = None,
         item_classes: set[str] | None = None,
+        suspicious_classes: set[str] | None = None,
     ) -> None:
         self.zones = zones or []
         self.person_classes = person_classes or DEFAULT_PERSON_CLASSES
         self.item_classes = item_classes or DEFAULT_ITEM_CLASSES
+        # Classes that directly label a box as suspicious behavior (single-
+        # class-per-box datasets, e.g. "Suspicious Behavior" vs "Normal
+        # Behavior") rather than requiring separate person+item boxes.
+        self.suspicious_classes = suspicious_classes or set()
         self._tracks: dict[int, TrackState] = {}
         # item_track_id -> the person_track_id it was last seen near
         self._item_last_person: dict[int, int] = {}
@@ -171,7 +193,44 @@ class ConcealmentDetector:
                 )
                 del self._item_last_person[item_id]
 
-        # 3. Zone-based heuristics for persons.
+        # 3. Sustained suspicious-behavior classes (direct single-box labeling).
+        for d in detections:
+            state = self._tracks[d["track_id"]]
+            if d["cls"] in self.suspicious_classes:
+                if (
+                    state.suspicious_since is None
+                    or state.suspicious_last_seen is None
+                    or now - state.suspicious_last_seen > SUSPICIOUS_RESET_GRACE_SECONDS
+                ):
+                    state.suspicious_since = now
+                    state.suspicious_alerted = False
+                state.suspicious_last_seen = now
+
+                sustained = now - state.suspicious_since
+                if sustained >= SUSPICIOUS_SUSTAIN_SECONDS and not state.suspicious_alerted:
+                    state.suspicious_alerted = True
+                    state.concealment_flag_until = now + CONCEALMENT_FLAG_TTL_SECONDS
+                    alerts.append(
+                        Alert(
+                            kind="suspicious_behavior",
+                            track_id=d["track_id"],
+                            severity="medium",
+                            score=min(1.0, sustained / (SUSPICIOUS_SUSTAIN_SECONDS * 2)),
+                            message=(
+                                f"Person track {d['track_id']} classified as '{d['cls']}' for "
+                                f"{sustained:.1f}s continuously."
+                            ),
+                            bbox=d["bbox"],
+                            timestamp=now,
+                        )
+                    )
+            else:
+                # Seeing a non-suspicious class for this track resets the streak
+                # (it will re-arm for grace-period-tolerant re-triggering above).
+                state.suspicious_since = None
+                state.suspicious_last_seen = None
+
+        # 4. Zone-based heuristics for persons.
         for person in persons:
             state = self._tracks[person["track_id"]]
             point = Point(_center(person["bbox"]))
