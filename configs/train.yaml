@@ -1,0 +1,24 @@
+# Training hyperparameters for the theft/suspicious-behavior detector.
+# Overridable via CLI flags on scripts/train.py.
+
+model: yolo11n.pt   # nano model: best speed/accuracy tradeoff for edge deployment
+data: configs/dataset.yaml
+epochs: 100
+imgsz: 640
+batch: 16
+patience: 20        # early stopping
+device: 0            # GPU index; set to "cpu" if no GPU available
+workers: 8
+project: runs/detect
+name: train
+seed: 0
+
+# Augmentation tuned for CCTV-style footage (varied lighting, angles, occlusion)
+hsv_h: 0.015
+hsv_s: 0.5
+hsv_v: 0.3
+degrees: 5.0
+translate: 0.1
+scale: 0.4
+fliplr: 0.5
+mosaic: 1.0

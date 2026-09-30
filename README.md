@@ -1,0 +1,94 @@
+# EdgeCentral — זיהוי גניבות/התנהגות חשודה בסופר/קיוסק מבוסס YOLO
+
+מערכת לזיהוי אירועי גניבה פוטנציאליים בווידאו (מצלמות אבטחה) עבור סופרמרקט/קיוסק, המבוססת על:
+
+1. **זיהוי אובייקטים (YOLO)** — אנשים, תיקים/תרמילים, פריטים.
+2. **מעקב (tracking)** — שמירת זהות אובייקט לאורך פריימים (ByteTrack, מובנה ב-Ultralytics).
+3. **שכבת היגיון התנהגותי (behavior heuristics)** — כיוון ש"גניבה" היא **התנהגות** ולא אובייקט בודד: הסתרת פריט בתיק/בגד, שהייה חריגה ליד מדף, תנועה מהירה של "אריזה" ללא קופה וכו'.
+4. **ייצוא לקצה (edge)** — ONNX / TensorRT להרצה על מכשיר edge ייעודי (Jetson וכו').
+
+> ⚠️ **חשוב — שימוש אחראי:** המערכת מייצרת **התראות לבדיקת אדם** (staff review), ולא קובעת אשמה אוטומטית. אין להשתמש בפלט כדי להאשים אדם ספציפי, לנעול דלתות אוטומטית, להזעיק משטרה אוטומטית, או לבצע זיהוי פנים/זיהוי אישי ללא ייעוץ משפטי מתאים (חוקי פרטיות, מצלמות אבטחה, הגנת הפרט). ודאו תאימות לחוק הישראלי (חוק הגנת הפרטיות, רשות להגנת הפרטיות) לפני פריסה בשטח.
+
+## מבנה הפרויקט
+
+```
+configs/            הגדרות דאטהסט ואימון
+scripts/            הורדת דאטהסט, הכנה, אימון, הערכה, ייצוא ל-edge
+detection/          שכבת מעקב + היגיון התנהגותי + התראות
+inference/          הרצת המודל בזמן אמת על מצלמה/RTSP/קובץ
+edge/               הנחיות פריסה על מכשיר edge (Jetson וכו')
+tests/              בדיקות יחידה להיגיון ההתנהגותי
+data/               דאטהסטים (לא נכנס ל-git)
+```
+
+## התקנה
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+## שלב 1: דאטהסט
+
+אין באפשרותי לספק צילומי אבטחה אמיתיים. יש להשתמש בדאטהסט ציבורי מתויג (bounding boxes) בפורמט YOLO. אפשרות מומלצת: **Roboflow Universe** — יש שם כמה דאטהסטים ציבוריים בשם "shoplifting detection" / "theft detection" עם מחלקות כמו `person`, `bag`, `normal`, `shoplifting`.
+
+1. הרשמה חינמית ל-https://roboflow.com וקבלת API key.
+2. איתור דאטהסט מתאים תחת "Shoplifting Detection" ב-Roboflow Universe, ובחירת ה-workspace / project / version.
+3. הגדרת משתני סביבה:
+
+```bash
+export ROBOFLOW_API_KEY=xxxx
+export ROBOFLOW_WORKSPACE=<workspace-slug>
+export ROBOFLOW_PROJECT=<project-slug>
+export ROBOFLOW_VERSION=<version-number>
+```
+
+4. הורדה:
+
+```bash
+python scripts/download_dataset.py
+python scripts/prepare_dataset.py
+```
+
+זה יוריד את הדאטהסט לתוך `data/raw/`, יאמת מבנה תקין (train/valid/test עם images+labels), ויכתוב `configs/dataset.yaml` סופי.
+
+אם אין לכם עדיין דאטהסט ספציפי — אפשר להתחיל עם דאטהסט generic של `person` + `backpack`/`handbag` (למשל תת-קבוצה מ-COCO) כבייסליין, ולשפר בהמשך עם דאטהסט ייעודי.
+
+## שלב 2: אימון
+
+```bash
+python scripts/train.py --model yolo11n.pt --epochs 100 --imgsz 640
+```
+
+הגדרות ברירת מחדל נמצאות ב-`configs/train.yaml`. `yolo11n`/`yolov8n` (nano) מומלצים כברירת מחדל כי הם קלים מספיק להרצה על מכשיר edge בזמן אמת. **דרוש GPU לאימון** — לא זמין בסביבת ה-sandbox הזו; יש להריץ את שלב האימון במחשב/שרת עם GPU (או Colab / cloud GPU), ואז להעביר את משקלי `best.pt` חזרה למכשיר ה-edge.
+
+## שלב 3: הערכה
+
+```bash
+python scripts/evaluate.py --weights runs/detect/train/weights/best.pt
+```
+
+## שלב 4: ייצוא למכשיר Edge
+
+```bash
+python scripts/export_edge.py --weights runs/detect/train/weights/best.pt --format onnx
+# ל-Jetson עם TensorRT:
+python scripts/export_edge.py --weights runs/detect/train/weights/best.pt --format engine --half
+```
+
+ראו `edge/deploy_jetson.md` לפרטי פריסה על Jetson.
+
+## שלב 5: הרצה בזמן אמת + התראות התנהגות
+
+```bash
+python -m inference.run_stream --weights best.onnx --source rtsp://<camera-ip>/stream --zones configs/zones.yaml
+```
+
+זה מריץ detection+tracking, מזין את התוצאות לשכבת ה-behavior heuristics (`detection/behavior.py`), ושומר התראות (תמונת snapshot + JSON) תחת `alerts/` לבדיקת צוות אבטחה.
+
+## בדיקות
+
+```bash
+pytest tests/
+```

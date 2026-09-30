@@ -1,0 +1,14 @@
+# Example zone configuration for behavior heuristics.
+# Coordinates are pixel points [x, y] in the camera's frame, forming a polygon.
+# Copy this file per-camera (e.g. configs/zones_cam1.yaml) and adjust to the real layout.
+
+zones:
+  - name: high_value_shelf
+    type: shelf
+    polygon: [[120, 200], [420, 200], [420, 480], [120, 480]]
+    dwell_alert_seconds: 8.0   # lingering longer than this near the shelf raises suspicion
+
+  - name: exit_no_checkout
+    type: exit
+    polygon: [[600, 0], [800, 0], [800, 480], [600, 480]]
+    # a tracked person reaching this zone while carrying a "concealed" flag raises a high-priority alert

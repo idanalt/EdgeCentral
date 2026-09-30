@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+data/raw/
+data/yolo/
+runs/
+alerts/
+*.pt
+*.onnx
+*.engine
+.env
