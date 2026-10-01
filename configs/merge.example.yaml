@@ -1,0 +1,26 @@
+# Merge config for scripts/merge_datasets.py.
+# Each source dataset may use different class names/indices (e.g. one uses
+# "0"/"1", another uses "Normal Behavior"/"Suspicious Behavior") -- class_map
+# translates each source's classes onto this shared unified list. A class
+# left out of a source's class_map is dropped from that source's labels.
+#
+# Copy this to configs/merge.yaml and edit `sources` as you accumulate more
+# downloaded/labeled datasets (one entry per `data/raw/<dataset>` folder).
+
+unified_classes: ["normal", "suspicious"]
+
+sources:
+  - path: data/raw/shoplifting-yefyu   # university-of-boumerdes, 8395 images
+    class_map:
+      "0": normal
+      "1": suspicious
+
+  - path: data/raw/shoplifting-sbnqg   # weaponDetection, 153 images
+    class_map:
+      "Normal Behavior": normal
+      "Suspicious Behavior": suspicious
+
+  # - path: data/raw/<your-site-1-footage>
+  #   class_map:
+  #     "normal": normal
+  #     "suspicious": suspicious

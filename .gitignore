@@ -3,8 +3,11 @@ __pycache__/
 *.pyc
 data/raw/
 data/yolo/
+data/merged/
 runs/
 alerts/
+configs/dataset.yaml
+configs/merge.yaml
 *.pt
 *.onnx
 *.engine
