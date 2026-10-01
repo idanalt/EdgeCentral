@@ -122,6 +122,7 @@ class ConcealmentDetector:
         person_classes: set[str] | None = None,
         item_classes: set[str] | None = None,
         suspicious_classes: set[str] | None = None,
+        min_suspicious_conf: float = 0.0,
     ) -> None:
         self.zones = zones or []
         self.person_classes = person_classes or DEFAULT_PERSON_CLASSES
@@ -130,6 +131,11 @@ class ConcealmentDetector:
         # class-per-box datasets, e.g. "Suspicious Behavior" vs "Normal
         # Behavior") rather than requiring separate person+item boxes.
         self.suspicious_classes = suspicious_classes or set()
+        # A frame's classification only counts toward the sustained-suspicious
+        # streak if the model's own confidence for it clears this bar --
+        # borderline frames (e.g. 0.4-0.6) are exactly where "holding an item
+        # normally" gets misread as concealment, so this filters them out.
+        self.min_suspicious_conf = min_suspicious_conf
         self._tracks: dict[int, TrackState] = {}
         # item_track_id -> the person_track_id it was last seen near
         self._item_last_person: dict[int, int] = {}
@@ -196,7 +202,10 @@ class ConcealmentDetector:
         # 3. Sustained suspicious-behavior classes (direct single-box labeling).
         for d in detections:
             state = self._tracks[d["track_id"]]
-            if d["cls"] in self.suspicious_classes:
+            is_confident_suspicious = (
+                d["cls"] in self.suspicious_classes and d.get("conf", 1.0) >= self.min_suspicious_conf
+            )
+            if is_confident_suspicious:
                 if (
                     state.suspicious_since is None
                     or state.suspicious_last_seen is None

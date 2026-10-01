@@ -124,6 +124,33 @@ def test_suspicious_streak_resets_on_normal_behavior():
     assert alerts == []
 
 
+def test_low_confidence_suspicious_frames_dont_count():
+    det = ConcealmentDetector(suspicious_classes={"suspicious"}, min_suspicious_conf=0.6)
+    t = 0.0
+    alerts = []
+    for _ in range(10):
+        alerts = det.update(
+            [{"track_id": 1, "cls": "suspicious", "bbox": (0, 0, 50, 50), "conf": 0.5}], now=t
+        )
+        t += 0.3
+    assert alerts == []  # never sustains -- every frame is below the confidence bar
+
+
+def test_high_confidence_suspicious_frames_do_count():
+    det = ConcealmentDetector(suspicious_classes={"suspicious"}, min_suspicious_conf=0.6)
+    t = 0.0
+    alerts = []
+    for _ in range(10):
+        alerts = det.update(
+            [{"track_id": 1, "cls": "suspicious", "bbox": (0, 0, 50, 50), "conf": 0.85}], now=t
+        )
+        if alerts:
+            break
+        t += 0.3
+    assert len(alerts) == 1
+    assert alerts[0].kind == "suspicious_behavior"
+
+
 def test_exit_with_concealment_is_high_priority():
     from shapely.geometry import Polygon
 

@@ -30,6 +30,7 @@ class TheftDetectionPipeline:
         person_classes: set[str] | None = None,
         item_classes: set[str] | None = None,
         suspicious_classes: set[str] | None = None,
+        min_suspicious_conf: float = 0.6,
     ) -> None:
         self.model = YOLO(weights)
         self.conf = conf
@@ -38,6 +39,7 @@ class TheftDetectionPipeline:
             person_classes=person_classes,
             item_classes=item_classes,
             suspicious_classes=suspicious_classes,
+            min_suspicious_conf=min_suspicious_conf,
         )
         self.sinks = sinks or []
 
@@ -46,16 +48,18 @@ class TheftDetectionPipeline:
         detections = []
         if result.boxes is not None and result.boxes.id is not None:
             names = result.names
-            for box, track_id, cls_idx in zip(
+            for box, track_id, cls_idx, conf in zip(
                 result.boxes.xyxy.cpu().numpy(),
                 result.boxes.id.cpu().numpy(),
                 result.boxes.cls.cpu().numpy(),
+                result.boxes.conf.cpu().numpy(),
             ):
                 detections.append(
                     {
                         "track_id": int(track_id),
                         "cls": names[int(cls_idx)],
                         "bbox": tuple(box.tolist()),
+                        "conf": float(conf),
                     }
                 )
 

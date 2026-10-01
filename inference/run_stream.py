@@ -39,6 +39,13 @@ def main() -> None:
         help="comma-separated class names that directly label suspicious behavior on a single box "
         "(e.g. 'Suspicious Behavior' for a dataset with Normal/Suspicious Behavior classes)",
     )
+    parser.add_argument(
+        "--min-suspicious-conf",
+        type=float,
+        default=0.6,
+        help="a frame only counts toward the sustained-suspicious streak if the model's confidence "
+        "for it is at least this -- raise it if normal item-holding is triggering alerts",
+    )
     args = parser.parse_args()
 
     def _split(s: str) -> set[str]:
@@ -57,6 +64,7 @@ def main() -> None:
         person_classes=_split(args.person_classes),
         item_classes=_split(args.item_classes) or None,
         suspicious_classes=_split(args.suspicious_classes) or None,
+        min_suspicious_conf=args.min_suspicious_conf,
     )
 
     try:
