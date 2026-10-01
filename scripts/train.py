@@ -16,13 +16,25 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CFG = ROOT / "configs" / "train.yaml"
 
 
+def _str_to_bool(s: str) -> bool:
+    if s.lower() in ("true", "1", "yes"):
+        return True
+    if s.lower() in ("false", "0", "no"):
+        return False
+    raise argparse.ArgumentTypeError(f"expected a boolean value, got {s!r}")
+
+
 def main() -> None:
     with open(DEFAULT_CFG) as f:
         cfg = yaml.safe_load(f)
 
     parser = argparse.ArgumentParser()
     for key, val in cfg.items():
-        parser.add_argument(f"--{key.replace('_', '-')}", default=val, type=type(val) if val is not None else str)
+        # bool is a subclass of int, so `type=type(val)` would otherwise bind
+        # `bool`, and argparse's default str->bool coercion treats any
+        # non-empty string (including "False") as truthy.
+        arg_type = _str_to_bool if isinstance(val, bool) else type(val) if val is not None else str
+        parser.add_argument(f"--{key.replace('_', '-')}", default=val, type=arg_type)
     parser.add_argument("--resume", action="store_true", help="resume the last interrupted run")
     args = parser.parse_args()
 
