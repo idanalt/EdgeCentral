@@ -41,6 +41,7 @@ class LocalLogSink(AlertSink):
             "track_id": alert.track_id,
             "severity": alert.severity,
             "score": alert.score,
+            "model_conf": alert.model_conf,
             "message": alert.message,
             "bbox": alert.bbox,
         }
@@ -73,6 +74,7 @@ class WebhookSink(AlertSink):
             "track_id": alert.track_id,
             "severity": alert.severity,
             "score": alert.score,
+            "model_conf": alert.model_conf,
             "message": alert.message,
             "bbox": alert.bbox,
         }

@@ -73,9 +73,12 @@ class TheftDetectionPipeline:
             x1, y1, x2, y2 = map(int, alert.bbox)
             color = {"low": (0, 200, 200), "medium": (0, 140, 255), "high": (0, 0, 255)}[alert.severity]
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 3)
+            label = alert.kind
+            if alert.model_conf is not None:
+                label += f" conf={alert.model_conf:.2f}"
             cv2.putText(
                 annotated,
-                alert.kind,
+                label,
                 (x1, max(0, y1 - 10)),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,

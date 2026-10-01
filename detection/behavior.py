@@ -111,6 +111,7 @@ class Alert:
     message: str
     bbox: BBox
     timestamp: float
+    model_conf: float | None = None  # the YOLO classification confidence that triggered this, if applicable
 
 
 class ConcealmentDetector:
@@ -231,6 +232,7 @@ class ConcealmentDetector:
                             ),
                             bbox=d["bbox"],
                             timestamp=now,
+                            model_conf=d.get("conf"),
                         )
                     )
             else:
