@@ -80,6 +80,28 @@ def test_loitering_alert_after_dwell_threshold():
     assert alerts[0].kind == "loitering"
 
 
+def test_item_person_association_does_not_leak_after_both_go_stale():
+    det = ConcealmentDetector()
+    det.update(
+        [
+            {"track_id": 1, "cls": "person", "bbox": (100, 100, 200, 300)},
+            {"track_id": 2, "cls": "item", "bbox": (140, 180, 160, 220)},
+        ],
+        now=0.0,
+    )
+    assert det._item_last_person == {2: 1}
+
+    # Both tracks vanish together (normal walk-off, not concealment). One
+    # update() call past the 300s window drops them from self._tracks...
+    det.update([], now=400.0)
+    assert det._tracks == {}
+    # ...and the next call notices the dangling association and clears it,
+    # rather than keeping it around forever.
+    det.update([], now=400.1)
+
+    assert det._item_last_person == {}
+
+
 def test_exit_with_concealment_is_high_priority():
     from shapely.geometry import Polygon
 

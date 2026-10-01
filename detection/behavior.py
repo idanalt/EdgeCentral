@@ -150,6 +150,12 @@ class ConcealmentDetector:
             item_state = self._tracks.get(item_id)
             person_state = self._tracks.get(person_id)
             if item_state is None or person_state is None:
+                # One side of the association already went stale (e.g. the
+                # person walked off normally, item and person both expired)
+                # without ever triggering a concealment alert — drop the
+                # mapping so it doesn't accumulate forever on a long-running
+                # edge deployment.
+                del self._item_last_person[item_id]
                 continue
             item_gone = item_id not in seen_ids and (now - item_state.last_seen) > ITEM_DISAPPEAR_GRACE_SECONDS
             person_still_present = person_id in seen_ids
