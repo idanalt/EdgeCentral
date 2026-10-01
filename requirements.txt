@@ -1,6 +1,8 @@
 ultralytics>=8.3.0
 roboflow>=1.1.0
-opencv-python-headless>=4.9.0
+# non-headless: inference/run_stream.py --display uses cv2.imshow, which
+# opencv-python-headless does not implement (it ships without GUI bindings)
+opencv-python>=4.9.0
 numpy>=1.26.0
 pyyaml>=6.0
 shapely>=2.0.0
