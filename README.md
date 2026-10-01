@@ -78,13 +78,19 @@ python -m inference.run_stream \
 
 אם היעד הוא לא אתר אחד אלא הרבה אתרים שונים, **אל תאמנו מודל נפרד לכל אתר** — זה לא ריאלי בקנה מידה. במקום זה, אספו דאטהסט **מגוון** (כמה דאטהסטים ציבוריים + כמה עשרות-מאות תמונות מכל אתר אמיתי שתתחילו לעבוד איתו, כולל סימולציות מבוימות ובהסכמה של "התנהגות חשודה") ומזגו לדאטהסט אחד לפני אימון. דאטהסטים שונים משתמשים לפעמים בשמות/אינדקסים שונים למחלקות (למשל `0`/`1` מול `Normal Behavior`/`Suspicious Behavior`) — `scripts/merge_datasets.py` ממפה את כולם לרשימת מחלקות אחידה:
 
-1. הורידו כל דאטהסט בנפרד עם `scripts/download_dataset.py` (לכל פרויקט ב-Roboflow בנפרד — תוכלו לשנות את משתני הסביבה ולהריץ שוב, כל אחד ייכנס לתיקייה משלו תחת `data/raw/`).
-2. העתיקו `configs/merge.example.yaml` ל-`configs/merge.yaml`, והגדירו `class_map` לכל מקור (איך למפות את שמות/אינדקסי המחלקות שלו ל-`unified_classes`).
-3. הרצה:
-   ```bash
-   python scripts/merge_datasets.py
-   ```
-   זה כותב את הדאטהסט המאוחד ל-`data/merged/` וכותב `configs/dataset.yaml` חדש שמצביע אליו — ממשיכים ישר לאימון.
+**הדרך המומלצת — `scripts/add_dataset.py`:** לכל דאטהסט חדש שמצאתם ב-Roboflow Universe (workspace/project/version), מריצים:
+```bash
+python scripts/add_dataset.py --workspace <ws> --project <proj> --version <n>
+```
+זה מוריד את הדאטהסט **וגם** רושם אותו אוטומטית ב-`configs/merge.yaml` (בלי לערוך YAML ביד — מקור נפוץ לשגיאות). הסקריפט מנחש את מיפוי המחלקות לפי שם (`normal`/`0` → normal, `suspicious`/`shoplifting`/`theft`/`high-suspicion`/`1`/`2` → suspicious, `low-suspicion`/`unlabeled` נשמטות) ו**תמיד מדפיס את הניחוש לבדיקה** — מחלקה שהוא לא מזהה בביטחון נשמטת (ולא מנוחשת לא נכון), אז תמיד כדאי להציץ ב-`configs/merge.yaml` אחרי זה ולתקן ידנית אם צריך.
+
+לאחר שהוספתם את כל הדאטהסטים הרצויים:
+```bash
+python scripts/merge_datasets.py
+```
+זה כותב את הדאטהסט המאוחד ל-`data/merged/` וכותב `configs/dataset.yaml` חדש שמצביע אליו — ממשיכים ישר לאימון.
+
+**הדרך הידנית (חלופה):** `scripts/download_dataset.py` עם משתני הסביבה + עריכה ידנית של `configs/merge.yaml` (העתק מ-`configs/merge.example.yaml`) — ראו את הדוגמה שם לפורמט.
 
 ## שלב 2: אימון
 
