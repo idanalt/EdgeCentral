@@ -48,10 +48,13 @@ export ROBOFLOW_VERSION=<version-number>
 
 ```bash
 python scripts/download_dataset.py
-python scripts/prepare_dataset.py
 ```
 
-זה יוריד את הדאטהסט לתוך `data/raw/`, יאמת מבנה תקין (train/valid/test עם images+labels), ויכתוב `configs/dataset.yaml` סופי.
+זה מוריד כל דאטהסט לתיקייה נפרדת משלו, `data/raw/<project-slug>/` (כדי שאפשר יהיה להוריד כמה דאטהסטים בלי שידרסו זה את זה).
+
+**אם יש לכם דאטהסט בודד בלבד:** תריצו גם `python scripts/prepare_dataset.py` — זה יאמת מבנה תקין (train/valid/test עם images+labels) ויכתוב `configs/dataset.yaml`.
+
+**אם יש לכם כמה דאטהסטים** (מומלץ — ראו "פריסה במספר אתרים" למטה): **דלגו על `prepare_dataset.py`** (הוא לא בנוי לכמה דאטהסטים בבת אחת) ועברו ישר ל-`scripts/merge_datasets.py`, שגם כותב את `configs/dataset.yaml` בעצמו.
 
 אם אין לכם עדיין דאטהסט ספציפי — אפשר להתחיל עם דאטהסט generic של `person` + `backpack`/`handbag` (למשל תת-קבוצה מ-COCO) כבייסליין, ולשפר בהמשך עם דאטהסט ייעודי.
 

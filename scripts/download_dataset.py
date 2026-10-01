@@ -45,10 +45,19 @@ def main() -> None:
 
     from roboflow import Roboflow
 
+    # Each dataset gets its own subfolder (data/raw/<project>) so downloading
+    # a second/third dataset never overwrites an earlier one's data.yaml or
+    # mixes their images together -- scripts/merge_datasets.py expects each
+    # source dataset to live in a separate folder.
+    dest = DATA_DIR / project
+    if dest.exists():
+        print(f"{dest} already exists -- skipping download (delete it first to re-download).")
+        return
+
     rf = Roboflow(api_key=api_key)
     ws = rf.workspace(workspace)
     proj = ws.project(project)
-    dataset = proj.version(int(version)).download("yolov8", location=str(DATA_DIR))
+    dataset = proj.version(int(version)).download("yolov8", location=str(dest))
     print(f"Downloaded dataset to: {dataset.location}")
 
 
