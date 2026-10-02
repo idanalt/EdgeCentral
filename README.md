@@ -33,6 +33,20 @@ pip install -r requirements.txt
 
 אין באפשרותי לספק צילומי אבטחה אמיתיים. יש להשתמש בדאטהסט ציבורי מתויג (bounding boxes) בפורמט YOLO. אפשרות מומלצת: **Roboflow Universe** — יש שם כמה דאטהסטים ציבוריים בשם "shoplifting detection" / "theft detection" עם מחלקות כמו `person`, `bag`, `normal`, `shoplifting`.
 
+### דוגמאות משלכם (targeted fine-tuning)
+
+כדי לתקן בעיה ספציפית שגיליתם (למשל false positives על "מחזיק חפץ בגלוי") — הדרך הכי יעילה היא לצלם דוגמאות ממוקדות ולתייג אותן, במקום לחפש עוד דאטהסט כללי:
+
+```bash
+python scripts/extract_frames.py --video my_clip.mp4 --out data/raw_frames/my_clip --every-seconds 0.5
+```
+
+מחלץ פריימים מווידאו לתיקייה (תמונות בודדות, מוכנות להעלאה/תיוג ב-Roboflow). לאחר התיוג וההורדה, מוסיפים כ-source נוסף ב-`configs/merge.yaml` וממשיכים לאמן **מהצ'קפוינט הקיים** (לא מאפס):
+
+```bash
+python scripts/train.py --model runs/detect/.../weights/best.pt --epochs 30
+```
+
 1. הרשמה חינמית ל-https://roboflow.com וקבלת API key.
 2. איתור דאטהסט מתאים תחת "Shoplifting Detection" ב-Roboflow Universe, ובחירת ה-workspace / project / version.
 3. הגדרת משתני סביבה:
