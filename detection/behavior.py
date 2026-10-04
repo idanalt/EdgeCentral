@@ -97,6 +97,7 @@ class TrackState:
     suspicious_since: float | None = None
     suspicious_last_seen: float | None = None
     suspicious_alerted: bool = False
+    suspicious_max_conf: float = 0.0
 
     def is_flagged(self, now: float) -> bool:
         return self.concealment_flag_until > now
@@ -201,12 +202,18 @@ class ConcealmentDetector:
                 del self._item_last_person[item_id]
 
         # 3. Sustained suspicious-behavior classes (direct single-box labeling).
+        #
+        # Streak continuity is based on the CLASS alone, not per-frame
+        # confidence -- confidence naturally jitters frame to frame even for
+        # a genuine event (e.g. hovering right at 0.55-0.6), and gating every
+        # single frame on it meant a real sustained concealment could never
+        # accumulate the full window if any one frame dipped below the bar.
+        # Instead we track the max confidence seen during the streak and only
+        # check it against the bar once, at the moment we'd otherwise alert.
         for d in detections:
             state = self._tracks[d["track_id"]]
-            is_confident_suspicious = (
-                d["cls"] in self.suspicious_classes and d.get("conf", 1.0) >= self.min_suspicious_conf
-            )
-            if is_confident_suspicious:
+            is_suspicious_class = d["cls"] in self.suspicious_classes
+            if is_suspicious_class:
                 if (
                     state.suspicious_since is None
                     or state.suspicious_last_seen is None
@@ -214,10 +221,16 @@ class ConcealmentDetector:
                 ):
                     state.suspicious_since = now
                     state.suspicious_alerted = False
+                    state.suspicious_max_conf = 0.0
                 state.suspicious_last_seen = now
+                state.suspicious_max_conf = max(state.suspicious_max_conf, d.get("conf", 1.0))
 
                 sustained = now - state.suspicious_since
-                if sustained >= SUSPICIOUS_SUSTAIN_SECONDS and not state.suspicious_alerted:
+                if (
+                    sustained >= SUSPICIOUS_SUSTAIN_SECONDS
+                    and not state.suspicious_alerted
+                    and state.suspicious_max_conf >= self.min_suspicious_conf
+                ):
                     state.suspicious_alerted = True
                     state.concealment_flag_until = now + CONCEALMENT_FLAG_TTL_SECONDS
                     alerts.append(
@@ -232,7 +245,7 @@ class ConcealmentDetector:
                             ),
                             bbox=d["bbox"],
                             timestamp=now,
-                            model_conf=d.get("conf"),
+                            model_conf=state.suspicious_max_conf,
                         )
                     )
             else:
@@ -240,6 +253,7 @@ class ConcealmentDetector:
                 # (it will re-arm for grace-period-tolerant re-triggering above).
                 state.suspicious_since = None
                 state.suspicious_last_seen = None
+                state.suspicious_max_conf = 0.0
 
         # 4. Zone-based heuristics for persons.
         for person in persons:

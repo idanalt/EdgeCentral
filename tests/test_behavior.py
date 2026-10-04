@@ -151,6 +151,29 @@ def test_high_confidence_suspicious_frames_do_count():
     assert alerts[0].kind == "suspicious_behavior"
 
 
+def test_jittering_confidence_around_the_bar_still_fires():
+    # Regression test: a genuine sustained event where per-frame confidence
+    # hovers around the bar (some frames above, some below) used to reset
+    # the whole streak on every dip, so it could never accumulate the full
+    # sustain window. The class stays "suspicious" throughout -- only the
+    # confidence wobbles -- so this should still alert once the streak is
+    # long enough and confidence clears the bar at least once.
+    det = ConcealmentDetector(suspicious_classes={"suspicious"}, min_suspicious_conf=0.6)
+    confs = [0.55, 0.58, 0.62, 0.54, 0.59, 0.61, 0.57]
+    t = 0.0
+    alerts = []
+    for conf in confs:
+        alerts = det.update(
+            [{"track_id": 1, "cls": "suspicious", "bbox": (0, 0, 50, 50), "conf": conf}], now=t
+        )
+        if alerts:
+            break
+        t += 0.3
+    assert len(alerts) == 1
+    assert alerts[0].kind == "suspicious_behavior"
+    assert alerts[0].model_conf == 0.62  # the max seen during the streak
+
+
 def test_exit_with_concealment_is_high_priority():
     from shapely.geometry import Polygon
 
